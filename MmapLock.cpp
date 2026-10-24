@@ -59,16 +59,17 @@ lockMappedMemoty(
         close(mi.fd);
         return ( 3 );
     }
+
+    const char *  const p = (char *)(mi.addr);
+    for ( size_t x = 0; x < mi.size; x += 1048576 ) {
+        volatile char dat = p[x];
+    }
+
     if ( mlock(mi.addr, mi.size) != 0 ) {
         perror("Error locking memory.");
         munmap(mi.addr, mi.size);
         close(mi.fd);
         return ( 3 );
-    }
-
-    const char *  const p = (char *)(mi.addr);
-    for ( size_t x = 0; x < mi.size; x += 1048576 ) {
-        volatile char dat = p[x];
     }
 
     fprintf(stdout,
@@ -83,8 +84,18 @@ lockMappedMemoty(
     return ( 0 );
 }
 
+void  accessPages(const  MappingInfo  * mi)
+{
+    const   char *  const p = (char *)(mi->addr);
+    const   size_t  len = mi->size;
+    for ( size_t x = 0; x < len; x += 1048576 ) {
+        volatile char dat = p[x];
+    }
+}
+
 int main(int argc, char * argv[])
 {
+    int     idx = 0;
     size_t  cbTotal = 0;
 
     if ( argc < 2 ) {
@@ -110,8 +121,10 @@ int main(int argc, char * argv[])
 
     printf("Press Ctrl+C to exit and release the memory.\n");
 
-    for (;;) {
-        sleep(3600);
+    for ( idx = 1; ; idx = (idx + 1) % argc ) {
+        if ( idx == 0 ) { idx = 1; }
+        sleep(300);
+        accessPages(maps + idx);
     }
 
 clean_up:
