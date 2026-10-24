@@ -13,66 +13,110 @@ exit 0
 #include    <unistd.h>
 
 
-int lockMappedMemoty(
-        const char * filepath)
+typedef  struct  {
+    const  char  *  path;
+    int         fd;
+    size_t      size;
+    void  *     addr;
+}  MappingInfo;
+
+
+int
+lockMappedMemoty(
+        const  char  *  fileName,
+        MappingInfo  *  mapInfo)
 {
-    int fd = open(filepath, O_RDONLY);
-    if ( fd == -1 ) {
+    MappingInfo  mi;
+
+    mapInfo->path   = NULL;
+    mapInfo->fd     = -1;
+    mapInfo->addr   = NULL;
+    mapInfo->size   = 0;
+
+    mi.path = fileName;
+    mi.fd   = open(fileName, O_RDONLY);
+    if ( mi.fd == -1 ) {
         perror("Error open file");
         return ( 2 );
     }
 
     struct stat sb;
-    if ( fstat(fd, &sb) == -1 ) {
+    if ( fstat(mi.fd, &sb) == -1 ) {
         perror("Error fstat");
         return ( 2 );
     }
 
-    size_t  cbSize  = sb.st_size;
-    if ( cbSize == 0 ) {
+    mi.size = sb.st_size;
+    if ( mi.size == 0 ) {
         fprintf(stderr, "File is empty\n");
-        close(fd);
+        close(mi.fd);
         return ( 2 );
     }
 
-    void * addr = mmap(NULL, cbSize, PROT_READ, MAP_SHARED, fd, 0);
-    if ( addr == MAP_FAILED ) {
+    mi.addr = mmap(NULL, mi.size, PROT_READ, MAP_SHARED, mi.fd, 0);
+    if ( mi.addr == MAP_FAILED ) {
         perror("Error mmap");
-        close(fd);
+        close(mi.fd);
         return ( 3 );
     }
-    if ( mlock(addr, cbSize) != 0 ) {
+    if ( mlock(mi.addr, mi.size) != 0 ) {
         perror("Error locking memory.");
-        munmap(addr, cbSize);
-        close(fd);
+        munmap(mi.addr, mi.size);
+        close(mi.fd);
         return ( 3 );
     }
 
     fprintf(stdout,
             "Successfully mapped and locked '%s' (%zu bytes) into memory.\n",
-            filepath,  cbSize);
+            mi.path, mi.size);
+
+    mapInfo->path   = mi.path;
+    mapInfo->fd     = mi.fd;
+    mapInfo->size   = mi.size;
+    mapInfo->addr   = mi.addr;
+
     return ( 0 );
 }
 
 int main(int argc, char * argv[])
 {
+    size_t  cbTotal = 0;
+
     if ( argc < 2 ) {
         fprintf(stderr, "Usage: %s <filename(s).\n", argv[0]);
         return ( 1 );
     }
 
-    const char * filepath = argv[1];
+    MappingInfo  * maps = (MappingInfo *)malloc(sizeof(MappingInfo) * argc);
+    for ( int i = 1; i < argc; ++ i ) {
+        if ( ! lockMappedMemoty(argv[i], maps + i) ) {
+            cbTotal += maps[i].size;
+        }
+    }
 
-    lockMappedMemoty(filepath);
+    if ( cbTotal == 0 ) {
+        fprintf(stdout,
+                "Failed. Total lock size is %zu bytes\n", cbTotal);
+        goto  clean_up;
+    }
+    fprintf(stdout,
+            "Total: mapped and locked (%zu bytes) into memory.\n",
+            cbTotal);
+
     printf("Press Ctrl+C to exit and release the memory.\n");
 
     for (;;) {
         sleep(3600);
     }
 
-    // munlock(addr, cbSize);
-    // munmap (addr, cbSize);
-    // close(fd);
+clean_up:
+    for ( int i = 1; i < argc; ++ i ) {
+        if ( maps[i].fd == -1 ) { continue; }
+
+        munlock(maps[i].addr, maps[i].size);
+        munmap (maps[i].addr, maps[i].size);
+        close(maps[i].fd);
+    }
 
     return ( 0 );
 }
