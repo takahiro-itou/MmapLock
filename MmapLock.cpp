@@ -13,44 +13,63 @@ exit 0
 #include    <unistd.h>
 
 
-int lockMappedMemoty(
-        const char * filepath)
+typedef  struct  {
+    const  char  *  path;
+    int         fd;
+    size_t      size;
+    void  *     addr;
+}  MappingInfo;
+
+
+int
+lockMappedMemoty(
+        const  char  *  fileName,
+        MappingInfo  *  mapInfo)
 {
-    int fd = open(filepath, O_RDONLY);
-    if ( fd == -1 ) {
+    MappingInfo  mi;
+
+    mi.path = fileName;
+    mi.fd   = open(fileName, O_RDONLY);
+    if ( mi.fd == -1 ) {
         perror("Error open file");
         return ( 2 );
     }
 
     struct stat sb;
-    if ( fstat(fd, &sb) == -1 ) {
+    if ( fstat(mi.fd, &sb) == -1 ) {
         perror("Error fstat");
         return ( 2 );
     }
 
-    size_t  cbSize  = sb.st_size;
-    if ( cbSize == 0 ) {
+    mi.size = sb.st_size;
+    if ( mi.size == 0 ) {
         fprintf(stderr, "File is empty\n");
-        close(fd);
+        close(mi.fd);
         return ( 2 );
     }
 
-    void * addr = mmap(NULL, cbSize, PROT_READ, MAP_SHARED, fd, 0);
-    if ( addr == MAP_FAILED ) {
+    mi.addr = mmap(NULL, mi.size, PROT_READ, MAP_SHARED, mi.fd, 0);
+    if ( mi.addr == MAP_FAILED ) {
         perror("Error mmap");
-        close(fd);
+        close(mi.fd);
         return ( 3 );
     }
-    if ( mlock(addr, cbSize) != 0 ) {
+    if ( mlock(mi.addr, mi.size) != 0 ) {
         perror("Error locking memory.");
-        munmap(addr, cbSize);
-        close(fd);
+        munmap(mi.addr, mi.size);
+        close(mi.fd);
         return ( 3 );
     }
 
     fprintf(stdout,
             "Successfully mapped and locked '%s' (%zu bytes) into memory.\n",
-            filepath,  cbSize);
+            mi.path, mi.size);
+
+    mapInfo->path   = mi.path;
+    mapInfo->fd     = mi.fd;
+    mapInfo->size   = mi.size;
+    mapInfo->addr   = mi.addr;
+
     return ( 0 );
 }
 
@@ -62,8 +81,9 @@ int main(int argc, char * argv[])
     }
 
     const char * filepath = argv[1];
+    MappingInfo maps[2];
 
-    lockMappedMemoty(filepath);
+    lockMappedMemoty(filepath, maps + 1);
     printf("Press Ctrl+C to exit and release the memory.\n");
 
     for (;;) {
