@@ -8,6 +8,7 @@ exit 0
 #include    <fcntl.h>
 #include    <stdio.h>
 #include    <stdlib.h>
+#include    <sys/mman.h>
 #include    <sys/stat.h>
 #include    <unistd.h>
 
@@ -38,6 +39,32 @@ int main(int argc, char * argv[])
         close(fd);
         return ( 2 );
     }
+
+    void * addr = mmap(NULL, cbSize, PROT_READ, MAP_SHARED, fd, 0);
+    if ( addr == MAP_FAILED ) {
+        perror("Error mmap");
+        close(fd);
+        return ( 3 );
+    }
+    if ( mlock(addr, cbSize) != 0 ) {
+        perror("Error locking memory.");
+        munmap(addr, cbSize);
+        close(fd);
+        return ( 3 );
+    }
+
+    fprintf(stdout,
+            "Successfully mapped and locked '%s' (%zu bytes) into memory.\n",
+            filepath,  cbSize);
+    printf("Press Ctrl+C to exit and release the memory.\n");
+
+    for (;;) {
+        sleep(3600);
+    }
+
+    munlock(addr, cbSize);
+    munmap (addr, cbSize);
+    close(fd);
 
     return ( 0 );
 }
