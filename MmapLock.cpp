@@ -28,6 +28,11 @@ lockMappedMemoty(
 {
     MappingInfo  mi;
 
+    mapInfo->path   = NULL;
+    mapInfo->fd     = -1;
+    mapInfo->addr   = NULL;
+    mapInfo->size   = 0;
+
     mi.path = fileName;
     mi.fd   = open(fileName, O_RDONLY);
     if ( mi.fd == -1 ) {
@@ -75,6 +80,8 @@ lockMappedMemoty(
 
 int main(int argc, char * argv[])
 {
+    size_t  cbTotal = 0;
+
     if ( argc < 2 ) {
         fprintf(stderr, "Usage: %s <filename(s).\n", argv[0]);
         return ( 1 );
@@ -82,8 +89,19 @@ int main(int argc, char * argv[])
 
     MappingInfo  * maps = (MappingInfo *)malloc(sizeof(MappingInfo) * argc);
     for ( int i = 1; i < argc; ++ i ) {
-        lockMappedMemoty(argv[i], maps + i);
+        if ( ! lockMappedMemoty(argv[i], maps + i) ) {
+            cbTotal += maps[i].size;
+        }
     }
+
+    if ( cbTotal == 0 ) {
+        fprintf(stdout,
+                "Failed. Total lock size is %zu bytes\n", cbTotal);
+        goto  clean_up;
+    }
+    fprintf(stdout,
+            "Total: mapped and locked (%zu bytes) into memory.\n",
+            cbTotal);
 
     printf("Press Ctrl+C to exit and release the memory.\n");
 
@@ -91,7 +109,10 @@ int main(int argc, char * argv[])
         sleep(3600);
     }
 
+clean_up:
     for ( int i = 1; i < argc; ++ i ) {
+        if ( maps[i].fd == -1 ) { continue; }
+
         munlock(maps[i].addr, maps[i].size);
         munmap (maps[i].addr, maps[i].size);
         close(maps[i].fd);
