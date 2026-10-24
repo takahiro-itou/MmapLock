@@ -66,8 +66,9 @@ lockMappedMemoty(
         return ( 3 );
     }
 
+    const char *  const p = (char *)(mi.addr);
     for ( size_t x = 0; x < mi.size; x += 1048576 ) {
-        volatile dat = addr[x];
+        volatile char dat = p[x];
     }
 
     fprintf(stdout,
