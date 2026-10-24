@@ -13,14 +13,9 @@ exit 0
 #include    <unistd.h>
 
 
-int main(int argc, char * argv[])
+int lockMappedMemoty(
+        const char * filepath)
 {
-    if ( argc < 2 ) {
-        fprintf(stderr, "Usage: %s <filename(s).\n", argv[0]);
-        return ( 1 );
-    }
-
-    const char * filepath = argv[1];
     int fd = open(filepath, O_RDONLY);
     if ( fd == -1 ) {
         perror("Error open file");
@@ -56,15 +51,28 @@ int main(int argc, char * argv[])
     fprintf(stdout,
             "Successfully mapped and locked '%s' (%zu bytes) into memory.\n",
             filepath,  cbSize);
+    return ( 0 );
+}
+
+int main(int argc, char * argv[])
+{
+    if ( argc < 2 ) {
+        fprintf(stderr, "Usage: %s <filename(s).\n", argv[0]);
+        return ( 1 );
+    }
+
+    const char * filepath = argv[1];
+
+    lockMappedMemoty(filepath);
     printf("Press Ctrl+C to exit and release the memory.\n");
 
     for (;;) {
         sleep(3600);
     }
 
-    munlock(addr, cbSize);
-    munmap (addr, cbSize);
-    close(fd);
+    // munlock(addr, cbSize);
+    // munmap (addr, cbSize);
+    // close(fd);
 
     return ( 0 );
 }
