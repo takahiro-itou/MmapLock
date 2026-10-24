@@ -80,19 +80,22 @@ int main(int argc, char * argv[])
         return ( 1 );
     }
 
-    const char * filepath = argv[1];
-    MappingInfo maps[2];
+    MappingInfo  * maps = (MappingInfo *)malloc(sizeof(MappingInfo) * argc);
+    for ( int i = 1; i < argc; ++ i ) {
+        lockMappedMemoty(argv[i], maps + i);
+    }
 
-    lockMappedMemoty(filepath, maps + 1);
     printf("Press Ctrl+C to exit and release the memory.\n");
 
     for (;;) {
         sleep(3600);
     }
 
-    // munlock(addr, cbSize);
-    // munmap (addr, cbSize);
-    // close(fd);
+    for ( int i = 1; i < argc; ++ i ) {
+        munlock(maps[i].addr, maps[i].size);
+        munmap (maps[i].addr, maps[i].size);
+        close(maps[i].fd);
+    }
 
     return ( 0 );
 }
