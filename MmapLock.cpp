@@ -66,6 +66,10 @@ lockMappedMemoty(
         return ( 3 );
     }
 
+    for ( size_t x = 0; x < mi.size; x += 1048576 ) {
+        volatile dat = addr[x];
+    }
+
     fprintf(stdout,
             "Successfully mapped and locked '%s' (%zu bytes) into memory.\n",
             mi.path, mi.size);
